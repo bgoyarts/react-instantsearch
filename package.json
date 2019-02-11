@@ -26,7 +26,7 @@
     "test:size": "bundlesize",
     "storybook": "start-storybook -p 6006 -c storybook -s storybook/public",
     "storybook:build": "build-storybook -s storybook/public -o website/dist/storybook -c storybook",
-    "website:build": "yarn storybook:build && node scripts/build-website.js"
+    "website:build": "yarn storybook:build && yarn webpack --config=website/examples/webpack.config.js"
   },
   "devDependencies": {
     "@babel/cli": "7.2.3",
@@ -82,6 +82,7 @@
     "eslint-plugin-react": "7.12.4",
     "gh-pages": "2.0.1",
     "glob": "7.1.3",
+    "html-webpack-plugin": "^3.2.0",
     "instantsearch.css": "7.1.0",
     "jest": "24.1.0",
     "jest-watch-typeahead": "0.2.1",
