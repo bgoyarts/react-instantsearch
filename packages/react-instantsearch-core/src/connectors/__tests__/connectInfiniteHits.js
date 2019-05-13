@@ -8,8 +8,10 @@ describe('connectInfiniteHits', () => {
       context: {
         ais: {
           mainTargetedIndex: 'index',
+          onInternalStateUpdate: jest.fn(),
         },
       },
+      refine: jest.fn(),
     });
 
     it('provides the current hits to the component', () => {
@@ -21,7 +23,13 @@ describe('connectInfiniteHits', () => {
         results: { hits, page: 0, hitsPerPage: 2, nbPages: 3 },
       });
 
-      expect(props).toEqual({ hits, hasMore: true });
+      expect(props).toEqual({
+        hits: hits.map(hit => expect.objectContaining(hit)),
+        hasPrevious: false,
+        hasMore: true,
+        refinePrevious: expect.any(Function),
+        refineNext: expect.any(Function),
+      });
     });
 
     it('accumulate hits internally', () => {
@@ -34,7 +42,7 @@ describe('connectInfiniteHits', () => {
         results: { hits, page: 0, hitsPerPage: 2, nbPages: 3 },
       });
 
-      expect(res1.hits).toEqual(hits);
+      expect(res1.hits).toEqual(hits.map(hit => expect.objectContaining(hit)));
       expect(res1.hasMore).toBe(true);
 
       const res2 = getProvidedProps(null, null, {
@@ -46,8 +54,47 @@ describe('connectInfiniteHits', () => {
         },
       });
 
-      expect(res2.hits).toEqual([...hits, ...hits2]);
+      expect(res2.hits).toEqual(
+        [...hits, ...hits2].map(hit => expect.objectContaining(hit))
+      );
       expect(res2.hasMore).toBe(true);
+    });
+
+    it('prepend hits internally', () => {
+      const context = createSingleIndexContext();
+      const getProvidedProps = connect.getProvidedProps.bind(context);
+
+      const initialPageHits = [{}, {}];
+      const previousPageHits = [{}, {}];
+      const initialPageProps = getProvidedProps(null, null, {
+        results: {
+          hits: initialPageHits,
+          page: 1,
+          hitsPerPage: 2,
+          nbPages: 3,
+        },
+      });
+
+      expect(initialPageProps.hits).toEqual(
+        initialPageHits.map(hit => expect.objectContaining(hit))
+      );
+      expect(initialPageProps.hasPrevious).toBe(true);
+
+      const previousPageProps = getProvidedProps(null, null, {
+        results: {
+          hits: previousPageHits,
+          page: 0,
+          hitsPerPage: 2,
+          nbPages: 3,
+        },
+      });
+
+      expect(previousPageProps.hits).toEqual(
+        [...previousPageHits, ...initialPageHits].map(hit =>
+          expect.objectContaining(hit)
+        )
+      );
+      expect(previousPageProps.hasPrevious).toBe(false);
     });
 
     it('accumulate hits internally while changing hitsPerPage configuration', () => {
@@ -59,10 +106,25 @@ describe('connectInfiniteHits', () => {
       const hits3 = [{}, {}, {}, {}, {}, {}, {}, {}];
 
       const res1 = getProvidedProps(null, null, {
-        results: { hits, page: 0, hitsPerPage: 6, nbPages: 10 },
+        results: {
+          hits,
+          page: 0,
+          hitsPerPage: 6,
+          nbPages: 10,
+          queryID: 'theQueryID_0',
+        },
       });
 
-      expect(res1.hits).toEqual(hits);
+      expect(res1.hits).toEqual(hits.map(hit => expect.objectContaining(hit)));
+      expect(res1.hits.map(hit => hit.__position)).toEqual([1, 2, 3, 4, 5, 6]);
+      expect(res1.hits.map(hit => hit.__queryID)).toEqual([
+        'theQueryID_0',
+        'theQueryID_0',
+        'theQueryID_0',
+        'theQueryID_0',
+        'theQueryID_0',
+        'theQueryID_0',
+      ]);
       expect(res1.hasMore).toBe(true);
 
       const res2 = getProvidedProps(null, null, {
@@ -71,10 +133,45 @@ describe('connectInfiniteHits', () => {
           page: 1,
           hitsPerPage: 6,
           nbPages: 10,
+          queryID: 'theQueryID_1',
         },
       });
 
-      expect(res2.hits).toEqual([...hits, ...hits2]);
+      expect(res2.hits).toEqual(
+        [...hits, ...hits2].map(hit => expect.objectContaining(hit))
+      );
+      expect(res2.hits.map(hit => hit.__position)).toEqual([
+        // page 0
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        // page 1
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+      ]);
+      expect(res2.hits.map(hit => hit.__queryID)).toEqual([
+        // page 0
+        'theQueryID_0',
+        'theQueryID_0',
+        'theQueryID_0',
+        'theQueryID_0',
+        'theQueryID_0',
+        'theQueryID_0',
+        // page 1
+        'theQueryID_1',
+        'theQueryID_1',
+        'theQueryID_1',
+        'theQueryID_1',
+        'theQueryID_1',
+        'theQueryID_1',
+      ]);
       expect(res2.hasMore).toBe(true);
 
       let res3 = getProvidedProps(null, null, {
@@ -83,10 +180,64 @@ describe('connectInfiniteHits', () => {
           page: 2,
           hitsPerPage: 8,
           nbPages: 10,
+          queryID: 'theQueryID_2',
         },
       });
 
-      expect(res3.hits).toEqual([...hits, ...hits2, ...hits3]);
+      expect(res3.hits).toEqual(
+        [...hits, ...hits2, ...hits3].map(hit => expect.objectContaining(hit))
+      );
+      expect(res3.hits.map(hit => hit.__position)).toEqual([
+        // page: 0, hitsPerPage: 6
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        // page: 1, hitsPerPage: 6
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        // hitsPerPage changed from 6 to 8, elements 13-16 are skipped
+        // page: 2, hitsPerPage: 8
+        17,
+        18,
+        19,
+        20,
+        21,
+        22,
+        23,
+        24,
+      ]);
+      expect(res3.hits.map(hit => hit.__queryID)).toEqual([
+        // page 0
+        'theQueryID_0',
+        'theQueryID_0',
+        'theQueryID_0',
+        'theQueryID_0',
+        'theQueryID_0',
+        'theQueryID_0',
+        // page 1
+        'theQueryID_1',
+        'theQueryID_1',
+        'theQueryID_1',
+        'theQueryID_1',
+        'theQueryID_1',
+        'theQueryID_1',
+        // page 2
+        'theQueryID_2',
+        'theQueryID_2',
+        'theQueryID_2',
+        'theQueryID_2',
+        'theQueryID_2',
+        'theQueryID_2',
+        'theQueryID_2',
+        'theQueryID_2',
+      ]);
       expect(res3.hasMore).toBe(true);
 
       // re-render with the same property
@@ -96,10 +247,64 @@ describe('connectInfiniteHits', () => {
           page: 2,
           hitsPerPage: 8,
           nbPages: 10,
+          queryID: 'theQueryID_2_',
         },
       });
 
-      expect(res3.hits).toEqual([...hits, ...hits2, ...hits3]);
+      expect(res3.hits).toEqual(
+        [...hits, ...hits2, ...hits3].map(hit => expect.objectContaining(hit))
+      );
+      expect(res3.hits.map(hit => hit.__position)).toEqual([
+        // page: 0, hitsPerPage: 6
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        // page: 1, hitsPerPage: 6
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        // hitsPerPage changed from 6 to 8, elements 13-16 are skipped
+        // page: 2, hitsPerPage: 8
+        17,
+        18,
+        19,
+        20,
+        21,
+        22,
+        23,
+        24,
+      ]);
+      expect(res3.hits.map(hit => hit.__queryID)).toEqual([
+        // page 0
+        'theQueryID_0',
+        'theQueryID_0',
+        'theQueryID_0',
+        'theQueryID_0',
+        'theQueryID_0',
+        'theQueryID_0',
+        // page 1
+        'theQueryID_1',
+        'theQueryID_1',
+        'theQueryID_1',
+        'theQueryID_1',
+        'theQueryID_1',
+        'theQueryID_1',
+        // page 2
+        'theQueryID_2',
+        'theQueryID_2',
+        'theQueryID_2',
+        'theQueryID_2',
+        'theQueryID_2',
+        'theQueryID_2',
+        'theQueryID_2',
+        'theQueryID_2',
+      ]);
       expect(res3.hasMore).toBe(true);
     });
 
@@ -108,7 +313,7 @@ describe('connectInfiniteHits', () => {
       const getProvidedProps = connect.getProvidedProps.bind(context);
 
       const hits = [{}, {}];
-      const nbPages = 100;
+      const nbPages = 5;
 
       let allHits = [];
       for (let page = 0; page < nbPages - 1; page++) {
@@ -120,10 +325,13 @@ describe('connectInfiniteHits', () => {
             page,
             hitsPerPage: hits.length,
             nbPages,
+            queryID: `theQueryID_${page}`,
           },
         });
 
-        expect(res.hits).toEqual(allHits);
+        expect(res.hits).toEqual(
+          allHits.map(hit => expect.objectContaining(hit))
+        );
         expect(res.hits).toHaveLength((page + 1) * 2);
         expect(res.hasMore).toBe(true);
       }
@@ -136,11 +344,38 @@ describe('connectInfiniteHits', () => {
           page: nbPages - 1,
           hitsPerPage: hits.length,
           nbPages,
+          queryID: `theQueryID_${nbPages - 1}`,
         },
       });
 
       expect(res.hits).toHaveLength(nbPages * 2);
-      expect(res.hits).toEqual(allHits);
+      expect(res.hits).toEqual(
+        allHits.map(hit => expect.objectContaining(hit))
+      );
+      expect(res.hits.map(hit => hit.__position)).toEqual([
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+      ]);
+      expect(res.hits.map(hit => hit.__queryID)).toEqual([
+        'theQueryID_0',
+        'theQueryID_0',
+        'theQueryID_1',
+        'theQueryID_1',
+        'theQueryID_2',
+        'theQueryID_2',
+        'theQueryID_3',
+        'theQueryID_3',
+        'theQueryID_4',
+        'theQueryID_4',
+      ]);
       expect(res.hasMore).toBe(false);
     });
 
@@ -174,11 +409,65 @@ describe('connectInfiniteHits', () => {
         },
       });
 
-      expect(props.hits).toEqual([...hits, ...hits2, ...hits3]);
+      expect(props.hits).toEqual(
+        [...hits, ...hits2, ...hits3].map(hit => expect.objectContaining(hit))
+      );
       expect(props.hasMore).toBe(false);
     });
 
-    it('adds 1 to page when calling refine', () => {
+    it('calls refine with next page when calling refineNext', () => {
+      const context = createSingleIndexContext();
+      const getProvidedProps = connect.getProvidedProps.bind(context);
+
+      const hits = [{}, {}];
+      const event = new Event('click');
+
+      const props = getProvidedProps(
+        {},
+        {},
+        {
+          results: {
+            hits,
+            page: 2,
+            hitsPerPage: 2,
+            nbPages: 3,
+          },
+        }
+      );
+
+      props.refineNext.apply(context, [event]);
+
+      expect(context.refine).toHaveBeenCalledTimes(1);
+      expect(context.refine).toHaveBeenLastCalledWith(event, 3);
+    });
+
+    it('calls refine with previous page when calling refinePrevious', () => {
+      const context = createSingleIndexContext();
+      const getProvidedProps = connect.getProvidedProps.bind(context);
+
+      const hits = [{}, {}];
+      const event = new Event('click');
+
+      const props = getProvidedProps(
+        {},
+        {},
+        {
+          results: {
+            hits,
+            page: 2,
+            hitsPerPage: 2,
+            nbPages: 3,
+          },
+        }
+      );
+
+      props.refinePrevious.apply(context, [event]);
+
+      expect(context.refine).toHaveBeenCalledTimes(1);
+      expect(context.refine).toHaveBeenLastCalledWith(event, 1);
+    });
+
+    it('adds 1 to page when calling refine without index', () => {
       const context = createSingleIndexContext();
       const refine = connect.refine.bind(context);
 
@@ -190,6 +479,20 @@ describe('connectInfiniteHits', () => {
 
       const state2 = refine(props, state1);
       expect(state2).toEqual({ page: 3 });
+    });
+
+    it('set page to the corresponding index', () => {
+      const context = createSingleIndexContext();
+      const refine = connect.refine.bind(context);
+
+      const props = {};
+      const state0 = {};
+      const event = new Event('click');
+      const index = 5;
+
+      const state1 = refine(props, state0, event, index);
+      // `index` is indexed from 0 but page number is indexed from 1
+      expect(state1).toEqual({ page: 6 });
     });
 
     it('automatically converts String state to Number', () => {
@@ -215,14 +518,18 @@ describe('connectInfiniteHits', () => {
       const searchResults = {
         results: {
           hits: [{}, {}, {}],
+          hitsPerPage: 3,
           page: 1,
           nbPages: 3,
         },
       };
 
       const expectation = {
-        hits: [{}, {}, {}],
+        hits: [{}, {}, {}].map(hit => expect.objectContaining(hit)),
+        hasPrevious: true,
         hasMore: true,
+        refinePrevious: expect.any(Function),
+        refineNext: expect.any(Function),
       };
 
       const actual = getProvidedProps(props, searchState, searchResults);
@@ -252,7 +559,13 @@ describe('connectInfiniteHits', () => {
         results: { second: { hits, page: 0, hitsPerPage: 2, nbPages: 3 } },
       });
 
-      expect(props).toEqual({ hits, hasMore: true });
+      expect(props).toEqual({
+        hits: hits.map(hit => expect.objectContaining(hit)),
+        hasPrevious: false,
+        hasMore: true,
+        refinePrevious: expect.any(Function),
+        refineNext: expect.any(Function),
+      });
     });
 
     it('accumulate hits internally', () => {
@@ -266,7 +579,7 @@ describe('connectInfiniteHits', () => {
         results: { second: { hits, page: 0, hitsPerPage: 2, nbPages: 3 } },
       });
 
-      expect(res1.hits).toEqual(hits);
+      expect(res1.hits).toEqual(hits.map(hit => expect.objectContaining(hit)));
       expect(res1.hasMore).toBe(true);
 
       const res2 = getProvidedProps(null, null, {
@@ -275,8 +588,51 @@ describe('connectInfiniteHits', () => {
         },
       });
 
-      expect(res2.hits).toEqual([...hits, ...hits2]);
+      expect(res2.hits).toEqual(
+        [...hits, ...hits2].map(hit => expect.objectContaining(hit))
+      );
       expect(res2.hasMore).toBe(true);
+    });
+
+    it('prepend hits internally', () => {
+      const context = createMultiIndexContext();
+      const getProvidedProps = connect.getProvidedProps.bind(context);
+
+      const initialPageHits = [{}, {}];
+      const previousPageHits = [{}, {}];
+      const initialPageProps = getProvidedProps(null, null, {
+        results: {
+          second: {
+            hits: initialPageHits,
+            page: 1,
+            hitsPerPage: 2,
+            nbPages: 3,
+          },
+        },
+      });
+
+      expect(initialPageProps.hits).toEqual(
+        initialPageHits.map(hit => expect.objectContaining(hit))
+      );
+      expect(initialPageProps.hasPrevious).toBe(true);
+
+      const previousPageProps = getProvidedProps(null, null, {
+        results: {
+          second: {
+            hits: previousPageHits,
+            page: 0,
+            hitsPerPage: 2,
+            nbPages: 3,
+          },
+        },
+      });
+
+      expect(previousPageProps.hits).toEqual(
+        [...previousPageHits, ...initialPageHits].map(hit =>
+          expect.objectContaining(hit)
+        )
+      );
+      expect(previousPageProps.hasPrevious).toBe(false);
     });
 
     it('accumulate hits internally while changing hitsPerPage configuration', () => {
@@ -291,7 +647,7 @@ describe('connectInfiniteHits', () => {
         results: { second: { hits, page: 0, hitsPerPage: 6, nbPages: 10 } },
       });
 
-      expect(res1.hits).toEqual(hits);
+      expect(res1.hits).toEqual(hits.map(hit => expect.objectContaining(hit)));
       expect(res1.hasMore).toBe(true);
 
       const res2 = getProvidedProps(null, null, {
@@ -300,7 +656,9 @@ describe('connectInfiniteHits', () => {
         },
       });
 
-      expect(res2.hits).toEqual([...hits, ...hits2]);
+      expect(res2.hits).toEqual(
+        [...hits, ...hits2].map(hit => expect.objectContaining(hit))
+      );
       expect(res2.hasMore).toBe(true);
 
       let res3 = getProvidedProps(null, null, {
@@ -309,7 +667,9 @@ describe('connectInfiniteHits', () => {
         },
       });
 
-      expect(res3.hits).toEqual([...hits, ...hits2, ...hits3]);
+      expect(res3.hits).toEqual(
+        [...hits, ...hits2, ...hits3].map(hit => expect.objectContaining(hit))
+      );
       expect(res3.hasMore).toBe(true);
 
       // re-render with the same property
@@ -319,8 +679,48 @@ describe('connectInfiniteHits', () => {
         },
       });
 
-      expect(res3.hits).toEqual([...hits, ...hits2, ...hits3]);
+      expect(res3.hits).toEqual(
+        [...hits, ...hits2, ...hits3].map(hit => expect.objectContaining(hit))
+      );
       expect(res3.hasMore).toBe(true);
+    });
+
+    it('should not accumulate hits internally while changing query', () => {
+      const context = createMultiIndexContext();
+      const getProvidedProps = connect.getProvidedProps.bind(context);
+
+      const hits = [{}, {}, {}, {}, {}, {}];
+      const hits2 = [{}, {}, {}, {}, {}, {}];
+
+      const res1 = getProvidedProps(null, null, {
+        results: {
+          second: {
+            hits,
+            page: 0,
+            hitsPerPage: 6,
+            nbPages: 10,
+            _state: { page: 0, query: 'a' },
+          },
+        },
+      });
+
+      expect(res1.hits).toEqual(hits.map(hit => expect.objectContaining(hit)));
+      expect(res1.hasMore).toBe(true);
+
+      const res2 = getProvidedProps(null, null, {
+        results: {
+          second: {
+            hits: hits2,
+            page: 0,
+            hitsPerPage: 6,
+            nbPages: 10,
+            _state: { page: 0, query: 'b' },
+          },
+        },
+      });
+
+      expect(res2.hits).toEqual(hits2.map(hit => expect.objectContaining(hit)));
+      expect(res2.hasMore).toBe(true);
     });
 
     it('should not reset while accumulating results', () => {
@@ -345,7 +745,9 @@ describe('connectInfiniteHits', () => {
           },
         });
 
-        expect(res.hits).toEqual(allHits);
+        expect(res.hits).toEqual(
+          allHits.map(hit => expect.objectContaining(hit))
+        );
         expect(res.hits).toHaveLength((page + 1) * 2);
         expect(res.hasMore).toBe(true);
       }
@@ -364,7 +766,9 @@ describe('connectInfiniteHits', () => {
       });
 
       expect(res.hits).toHaveLength(nbPages * 2);
-      expect(res.hits).toEqual(allHits);
+      expect(res.hits).toEqual(
+        allHits.map(hit => expect.objectContaining(hit))
+      );
       expect(res.hasMore).toBe(false);
     });
 
@@ -392,7 +796,9 @@ describe('connectInfiniteHits', () => {
         },
       });
 
-      expect(props.hits).toEqual([...hits, ...hits2, ...hits3]);
+      expect(props.hits).toEqual(
+        [...hits, ...hits2, ...hits3].map(hit => expect.objectContaining(hit))
+      );
       expect(props.hasMore).toBe(false);
     });
   });

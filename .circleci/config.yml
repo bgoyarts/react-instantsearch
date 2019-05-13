@@ -2,7 +2,7 @@ aliases:
   - &install_yarn_version
     name: Install specific Yarn version
     command: |
-      curl -o- -L https://yarnpkg.com/install.sh | bash -s -- --version 1.13.0
+      curl -o- -L https://yarnpkg.com/install.sh | bash -s -- --version 1.15.2
       echo 'export PATH="$HOME/.yarn/bin:$HOME/.config/yarn/global/node_modules/.bin:$PATH"' >> $BASH_ENV
 
   - &restore_yarn_cache
@@ -23,7 +23,7 @@ aliases:
 defaults: &defaults
   working_directory: ~/react-instantsearch
   docker:
-    - image: circleci/node:8.15.1@sha256:abd4f398e688c68d6f6967382bc37a7cbc64f39c57791a0bc3b80d7b3453e53e
+    - image: circleci/node:8.16.0@sha256:22956cf80c5d01484fe5958f82dcd8498acd25504e5079b7f7f694a77315caf4
 
 version: 2
 jobs:
@@ -60,7 +60,7 @@ jobs:
   test_e2e:
     <<: *defaults
     docker:
-      - image: circleci/node:8.15.1-browsers@sha256:bf07b479f71db55bee34b712f1bf2aafb83335209ac6000bc61737568912c787
+      - image: circleci/node:8.16.0-browsers@sha256:7399b7ebd0c937d8d5769bfc8732ed769e85a5c4012b77a78cf84cccbba96e20
     steps:
       - checkout
       - run: *install_yarn_version
