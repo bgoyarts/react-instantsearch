@@ -19,7 +19,21 @@ type Props = {
 
 const cx = createClassNames('Hits');
 
-const Hits: React.SFC<Props> = ({
+const DefaultHitComponent: React.FC<HitProps> = props => (
+  <div
+    style={{
+      borderBottom: '1px solid #bbb',
+      paddingBottom: '5px',
+      marginBottom: '5px',
+      wordBreak: 'break-all',
+    }}
+  >
+    {JSON.stringify(props).slice(0, 100)}
+    ...
+  </div>
+);
+
+const Hits: React.FC<Props> = ({
   hits,
   className = '',
   hitComponent: HitComponent = DefaultHitComponent,
@@ -32,20 +46,6 @@ const Hits: React.SFC<Props> = ({
         </li>
       ))}
     </ul>
-  </div>
-);
-
-const DefaultHitComponent: React.FC<HitProps> = props => (
-  <div
-    style={{
-      borderBottom: '1px solid #bbb',
-      paddingBottom: '5px',
-      marginBottom: '5px',
-      wordBreak: 'break-all',
-    }}
-  >
-    {JSON.stringify(props).slice(0, 100)}
-    ...
   </div>
 );
 

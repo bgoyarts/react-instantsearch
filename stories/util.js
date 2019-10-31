@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import PropTypes from 'prop-types';
 import { linkTo } from '@storybook/addon-links';
+import algoliasearch from 'algoliasearch/lite';
 import {
   InstantSearch,
   ClearRefinements,
@@ -12,16 +13,14 @@ import {
 } from 'react-instantsearch-dom';
 import 'instantsearch.css/themes/algolia.css';
 
-export const CustomHits = connectHits(({ hits }) => (
+const Hits = ({ hits }) => (
   <div className="hits">
     {hits.map(hit => (
       <div key={hit.objectID} className="hit">
         {hit.image && (
           <div className="hit-picture">
             <img
-              src={`https://res.cloudinary.com/hilnmyskv/image/fetch/h_100,q_100,f_auto/${
-                hit.image
-              }`}
+              src={`https://res.cloudinary.com/hilnmyskv/image/fetch/h_100,q_100,f_auto/${hit.image}`}
             />
           </div>
         )}
@@ -41,26 +40,13 @@ export const CustomHits = connectHits(({ hits }) => (
       </div>
     ))}
   </div>
-));
-
-export const Wrap = ({ appId, apiKey, indexName, children }) => (
-  <InstantSearch appId={appId} apiKey={apiKey} indexName={indexName}>
-    {children}
-  </InstantSearch>
 );
 
-Wrap.propTypes = {
-  children: PropTypes.node.isRequired,
-  appId: PropTypes.string,
-  apiKey: PropTypes.string,
-  indexName: PropTypes.string,
+Hits.propTypes = {
+  hits: PropTypes.array.isRequired,
 };
 
-Wrap.defaultProps = {
-  appId: 'latency',
-  apiKey: '6be0576ff61c053d5f9a3225e2a90f76',
-  indexName: 'instant_search',
-};
+export const CustomHits = connectHits(Hits);
 
 export const WrapWithHits = ({
   searchParameters: askedSearchParameters = {},
@@ -76,6 +62,10 @@ export const WrapWithHits = ({
   initialSearchState,
   onSearchStateChange,
 }) => {
+  const searchClient = useMemo(() => {
+    return algoliasearch(appId, apiKey);
+  }, [appId, apiKey]);
+
   const sourceCodeUrl = `https://github.com/algolia/react-instantsearch/tree/master/stories/${linkedStoryGroup}.stories.js`;
   const playgroundLink = hasPlayground ? (
     <button
@@ -116,12 +106,10 @@ export const WrapWithHits = ({
 
   return (
     <InstantSearch
-      appId={appId}
-      apiKey={apiKey}
+      searchClient={searchClient}
       indexName={indexName}
       searchState={searchState}
       onSearchStateChange={setNextSearchState}
-      createURL={() => ''}
     >
       <Configure {...searchParameters} />
       <div>

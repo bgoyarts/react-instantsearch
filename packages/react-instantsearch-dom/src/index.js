@@ -6,6 +6,8 @@ export { translatable } from 'react-instantsearch-core';
 // Widget
 export { Configure } from 'react-instantsearch-core';
 export { QueryRuleContext } from 'react-instantsearch-core';
+export { Index } from 'react-instantsearch-core';
+export { InstantSearch } from 'react-instantsearch-core';
 
 // Connectors
 export { connectAutoComplete } from 'react-instantsearch-core';
@@ -34,8 +36,6 @@ export { connectStats } from 'react-instantsearch-core';
 export { connectToggleRefinement } from 'react-instantsearch-core';
 
 // DOM
-export { default as InstantSearch } from './widgets/InstantSearch';
-export { default as Index } from './widgets/Index';
 export { default as Breadcrumb } from './widgets/Breadcrumb';
 export { default as ClearRefinements } from './widgets/ClearRefinements';
 export { default as CurrentRefinements } from './widgets/CurrentRefinements';
@@ -60,7 +60,11 @@ export { default as Snippet } from './widgets/Snippet';
 export { default as SortBy } from './widgets/SortBy';
 export { default as Stats } from './widgets/Stats';
 export { default as ToggleRefinement } from './widgets/ToggleRefinement';
+export { default as VoiceSearch } from './widgets/VoiceSearch';
 export { default as QueryRuleCustomData } from './widgets/QueryRuleCustomData';
 
 // Utils
 export { createClassNames } from './core/utils';
+
+// voiceSearchHelper
+export { default as createVoiceSearchHelper } from './lib/voiceSearchHelper';
